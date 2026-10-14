@@ -33,6 +33,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/settings"
 )
@@ -507,6 +508,15 @@ func codexFilesIn(dir string) []file {
 	var out []file
 	for _, folder := range []string{"sessions", "archived_sessions"} {
 		root := filepath.Join(dir, folder)
+		// The folder can be a link: the Codex CLI keeps .codex on another drive
+		// by making ~/.codex/sessions a junction to it, and a symlink elsewhere.
+		// WalkDir lstat()s the root it is handed, where a link is no folder at
+		// all, so it walks nothing: follow the link first.
+		if fi, err := os.Lstat(root); err == nil && !fi.IsDir() {
+			if real, err := proc.RealPath(root); err == nil {
+				root = real
+			}
+		}
 		filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return nil
