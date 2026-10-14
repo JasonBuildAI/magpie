@@ -14,6 +14,6 @@ func listCommand(ctx context.Context, prefix string) *exec.Cmd {
 	if prefix != "" {
 		filter = ` -Filter "Name like '` + strings.ReplaceAll(prefix, "'", "''") + `%'"`
 	}
-	return CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+	return CommandContext(ctx, PowerShell(), "-NoProfile", "-NonInteractive", "-Command",
 		`Get-CimInstance Win32_Process`+filter+` | ForEach-Object { "$($_.ProcessId) $($_.CommandLine)" }`)
 }

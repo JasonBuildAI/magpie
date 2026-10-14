@@ -142,7 +142,7 @@ func resumeSession(s sessions.Session) tea.Cmd {
 	}
 	c := proc.Command("sh", "-c", s.Resume)
 	if runtime.GOOS == "windows" {
-		c = proc.Command("powershell", "-NoProfile", "-Command", s.Resume)
+		c = proc.Command(proc.PowerShell(), "-NoProfile", "-Command", s.Resume)
 	}
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		if err != nil {

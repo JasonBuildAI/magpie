@@ -77,7 +77,7 @@ var runInstaller = func(ctx context.Context, c agentCLI) ([]byte, error) {
 		// does: on PowerShell's command line, Microsoft Defender took
 		// "irm <url> | iex" for a Trojan (Trojan:Win32/Commando.A!ml) and
 		// stopped it before it ran, which came back as "Access is denied"
-		cmd = proc.CommandContext(ctx, "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "-")
+		cmd = proc.CommandContext(ctx, proc.PowerShell(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "-")
 		cmd.Stdin = strings.NewReader(c.ps + "\n")
 	} else {
 		cmd = proc.CommandContext(ctx, "bash", "-c", c.sh)

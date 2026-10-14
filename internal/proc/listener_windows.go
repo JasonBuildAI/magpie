@@ -17,7 +17,7 @@ import (
 // failure is no listener, as lsof and /proc say it; any other failure, or
 // a PowerShell cut short, is still an error.
 func listeningOn(ctx context.Context, port int) ([]int, error) {
-	out, err := CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
+	out, err := CommandContext(ctx, PowerShell(), "-NoProfile", "-NonInteractive", "-Command",
 		`try { Get-NetTCPConnection -State Listen -LocalPort `+strconv.Itoa(port)+` -ErrorAction Stop | ForEach-Object { $_.OwningProcess } } `+
 			`catch { if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { exit 0 }; [Console]::Error.WriteLine($_); exit 1 }`).Output()
 	if err != nil {
