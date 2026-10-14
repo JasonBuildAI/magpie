@@ -208,8 +208,14 @@ func Collect(keys bool, app string) (Bundle, error) {
 		searches = append(searches, a)
 	}
 	b.Searches = &searches
-	if _, err := os.Stat(settings.Path()); err == nil {
-		s := settings.Load()
+	// a settings.json that is there but can't be read is unknown, never the
+	// defaults (settings.LoadChecked): carrying the defaults would bring
+	// them in on every machine the bundle is put back on, taking the user's
+	// theme, language, text size and allow list away, as carrying no
+	// providers would take every provider away (provider.Stored)
+	if s, err := settings.LoadChecked(); err != nil {
+		return b, err
+	} else if _, err := os.Stat(settings.Path()); err == nil {
 		if !keys {
 			s.LANKey, s.LANKeyID = "", ""
 			s.OTel.Headers = nil

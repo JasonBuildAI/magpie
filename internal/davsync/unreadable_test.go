@@ -11,6 +11,7 @@ import (
 
 	"github.com/yetone/magpie/internal/backup"
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/settings"
 )
 
 // A providers.json that can't be read is never pushed as no providers: a
@@ -79,5 +80,74 @@ func TestSyncStopsOnUnreadableProviders(t *testing.T) {
 	}
 	if got := ids(); !slices.Equal(got, []string{"deepseek=k1"}) {
 		t.Fatalf("b lost its providers to a's broken file: %v", got)
+	}
+}
+
+// A settings.json that can't be read is never pushed as the defaults: a
+// sync stops on it, the server keeps the settings, and another computer
+// mirroring the server keeps them too.
+func TestSyncStopsOnUnreadableSettings(t *testing.T) {
+	fake := &fakeDAV{files: map[string][]byte{}, etags: map[string]string{}, dirs: map[string]bool{"/dav": true}}
+	srv := httptest.NewServer(fake)
+	defer srv.Close()
+	ctx := context.Background()
+	cfg := Config{URL: srv.URL + "/dav/", User: "me", Password: "pw", Passphrase: "correct horse", Keys: true}
+
+	a, b := newComputer(t), newComputer(t)
+	b.use(t)
+	if err := Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
+	a.use(t)
+	if err := settings.Save(settings.Settings{Theme: "dark", Lang: "zh"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := Now(ctx); err != nil {
+		t.Fatal(err)
+	}
+	b.use(t)
+	if err := Now(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if s := settings.Load(); s.Theme != "dark" || s.Lang != "zh" {
+		t.Fatalf("b's settings: %+v", s)
+	}
+
+	// a's file is cut short
+	a.use(t)
+	whole, err := os.ReadFile(settings.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := whole[:len(whole)/2]
+	if err := os.WriteFile(settings.Path(), broken, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	puts := fake.puts
+	if err := Now(ctx); err == nil {
+		t.Fatal("a synced a broken settings.json")
+	}
+	if fake.puts != puts {
+		t.Fatal("a pushed a broken settings.json")
+	}
+	if after, _ := os.ReadFile(settings.Path()); !bytes.Equal(after, broken) {
+		t.Fatal("a's broken settings.json was written over")
+	}
+	if _, err := backup.Collect(true, "test"); err == nil {
+		t.Fatal("a backup of a broken settings.json must stop")
+	}
+	remote, err := backup.Open(fake.files["/dav/magpie/magpie.magpie-backup"], "correct horse")
+	if err != nil || remote.Settings == nil || remote.Settings.Theme != "dark" || remote.Settings.Lang != "zh" {
+		t.Fatalf("on the server: %v %+v", err, remote.Settings)
+	}
+	b.use(t)
+	if err := Now(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if s := settings.Load(); s.Theme != "dark" || s.Lang != "zh" {
+		t.Fatalf("b lost its settings to a's broken file: %+v", s)
 	}
 }
