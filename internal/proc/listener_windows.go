@@ -1,8 +1,10 @@
 package proc
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -10,10 +12,16 @@ import (
 )
 
 // listeningOn asks Get-NetTCPConnection, which names each listener's owner.
+// The cmdlet exits 1 for none found, as lsof does, and that is no error: the
+// gateway's take-over waits on this read for an older magpie to let the port
+// go. Only an exit that wrote nothing on either stream, within the caller's
+// deadline, is none found: a read that failed says why on stderr, and one cut
+// short by the deadline writes nothing at all.
 func listeningOn(ctx context.Context, port int) ([]int, error) {
 	out, err := CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command",
 		`Get-NetTCPConnection -State Listen -LocalPort `+strconv.Itoa(port)+` -ErrorAction SilentlyContinue | ForEach-Object { $_.OwningProcess }`).Output()
-	if err != nil {
+	var ee *exec.ExitError
+	if err != nil && !(errors.As(err, &ee) && len(bytes.TrimSpace(out)) == 0 && len(bytes.TrimSpace(ee.Stderr)) == 0 && ctx.Err() == nil) {
 		return nil, err
 	}
 	var ps []int

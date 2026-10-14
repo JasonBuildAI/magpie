@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 )
 
 // The process listening on a port is found, with the program it runs: here
@@ -31,6 +32,50 @@ func TestListeningOn(t *testing.T) {
 	want, _ := os.Executable()
 	if a, b := evalPath(got), evalPath(want); a != b {
 		t.Fatalf("program %q, want %q", a, b)
+	}
+}
+
+// A port nothing listens on is no processes, not an error. Windows'
+// Get-NetTCPConnection exits 1 for none found, as lsof does: taken for a
+// failure, the gateway's take-over never sees the older magpie let the port
+// go and says "stuck" with the port already free.
+func TestNothingListeningIsNoError(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	if err := ln.Close(); err != nil {
+		t.Fatal(err)
+	}
+	pids, err := ListeningOn(context.Background(), port)
+	if err != nil {
+		t.Fatalf("nothing listens on %d: %v", port, err)
+	}
+	if slices.Contains(pids, os.Getpid()) {
+		t.Fatalf("this process still listens on %d: %v", port, pids)
+	}
+}
+
+// A read cut short by the caller's deadline must not answer "nothing
+// listens" while the port is held: the PowerShell the deadline kills exits
+// with nothing written, as none found does, and the gateway's take-over
+// reads that answer as an older magpie letting the port go. The deadline
+// below is longer than starting the process takes (milliseconds) and short
+// enough to cut the read short (1.6s for a bare `1` here, 5.7s for this
+// read); a machine that answers in time answers with this process, which
+// passes too.
+func TestListeningOnCutShortDoesNotAnswerNone(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	pids, err := ListeningOn(ctx, ln.Addr().(*net.TCPAddr).Port)
+	if err == nil && !slices.Contains(pids, os.Getpid()) {
+		t.Fatalf("a read cut short answered %v with no error, while this process holds the port", pids)
 	}
 }
 

@@ -20,10 +20,11 @@ func listeningOn(ctx context.Context, port int) ([]int, error) {
 	}
 	out, err := CommandContext(ctx, lsof, "-nP", "-a", "-iTCP:"+strconv.Itoa(port), "-sTCP:LISTEN", "-t").Output()
 	var ee *exec.ExitError
-	if err != nil && !(errors.As(err, &ee) && len(bytes.TrimSpace(out)) == 0) {
+	// lsof says 1 for none found; a read cut short by the caller's deadline
+	// exits with nothing written too, and that is not none found
+	if err != nil && !(errors.As(err, &ee) && len(bytes.TrimSpace(out)) == 0 && ctx.Err() == nil) {
 		return nil, err
 	}
-	// lsof says 1 for none found
 	return pids(string(out)), nil
 }
 

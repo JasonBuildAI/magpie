@@ -18,7 +18,9 @@ var ErrDenied = errors.New("not allowed to end it")
 
 // ListeningOn is the ids of the processes listening on TCP port, that this
 // user can see: lsof on a Mac, /proc on Linux, Get-NetTCPConnection on
-// Windows. Another user's process may be missing.
+// Windows. Another user's process may be missing. A port nothing listens on
+// is no processes and no error: the gateway's take-over waits on that answer
+// to know an older magpie let the port go.
 func ListeningOn(ctx context.Context, port int) ([]int, error) { return listeningOn(ctx, port) }
 
 // Executable is the path of the program process pid runs, as the system
