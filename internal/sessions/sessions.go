@@ -410,6 +410,16 @@ func stat(f *file) bool {
 	return true
 }
 
+// linkedFolder is whether e is a link to a folder rather than a folder of
+// its own: a symlink, or on Windows a junction, which Go reports as
+// irregular, not as a symlink — its lstat is no directory either. A reader
+// that descends only into IsDir() or ModeSymlink entries walks past it
+// (#2233's shape, one level in); a path through the link is read as usual,
+// the filesystem resolving it.
+func linkedFolder(e os.DirEntry) bool {
+	return e.Type()&os.ModeSymlink != 0 || runtime.GOOS == "windows" && e.Type()&os.ModeIrregular != 0
+}
+
 // ccFiles are the session files of an agent that keeps them as Claude Code
 // does, under its folder's projects/: a session's own <id>.jsonl in its
 // project's folder, its subagents' in <id>/subagents/, and the agents of
@@ -419,7 +429,7 @@ func ccFiles(agent, dir string) []file {
 	projects := filepath.Join(dir, "projects")
 	var out []file
 	for _, project := range readDirectory(projects) {
-		if !project.IsDir() && project.Type()&os.ModeSymlink == 0 {
+		if !project.IsDir() && !linkedFolder(project) {
 			continue
 		}
 		root := filepath.Join(projects, project.Name())
@@ -430,7 +440,7 @@ func ccFiles(agent, dir string) []file {
 				if stat(&f) {
 					out = append(out, f)
 				}
-			} else if e.IsDir() || e.Type()&os.ModeSymlink != 0 {
+			} else if e.IsDir() || linkedFolder(e) {
 				subs := filepath.Join(path, "subagents")
 				for _, sub := range readDirectory(subs) {
 					if sub.IsDir() || !strings.HasSuffix(sub.Name(), ".jsonl") {
