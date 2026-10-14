@@ -608,7 +608,10 @@ func writeClaudeCredential(loc claudeCredentialLocation, c claudeCredentials) er
 		b = one.Bytes()
 	}
 	if !loc.keychain {
-		if err := os.WriteFile(loc.path, append(b, '\n'), 0o600); err != nil {
+		// through a temp file flushed to the disk before it is renamed in:
+		// this file is Claude Code's own sign-in, and one left half-written
+		// by a machine going down mid-write reads as signed out (#1505)
+		if err := writeFileAtomic(loc.path, append(b, '\n')); err != nil {
 			return err
 		}
 	} else {
@@ -1026,7 +1029,11 @@ func codexToken(ctx context.Context, path string) (tok, accountID string, err er
 	}
 	// keep every other field of the file as Codex CLI wrote it
 	if out, err := json.MarshalIndent(raw, "", "  "); err == nil {
-		os.WriteFile(path, append(out, '\n'), 0o600)
+		// and write it through a temp file flushed to the disk before it is
+		// renamed in: this is the user's own sign-in, read by Codex CLI, the
+		// Codex app and every IDE extension, and one left half-written by a
+		// machine going down mid-write reads as signed out (#1505)
+		_ = writeFileAtomic(path, append(out, '\n'))
 	}
 	return tok, accountID, nil
 }
