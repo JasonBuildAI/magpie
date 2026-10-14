@@ -109,6 +109,7 @@ How the store handles picks and names:
 - Switching a plugin off hands the id to the other plugin until it is switched on again.
 - Re-adding a plugin under a new version or spec keeps its picks.
 - Remove, off, options and prefer find a plugin by its exact spec first, then by package name (`indexOf` in `store.go`). This way, acting on one plugin never reaches another plugin that has the same package name.
+- A plugin added from a file or a folder is this computer's alone: `Carried` leaves it out of a backup, and `AddPlugins` doesn't install it on the machine restoring one. A spec rooted the way any system roots one — a leading `/` or `\` (a UNC path among them), a drive letter, `file://` — is a path here (`IsPath` in `store.go`). Before, Windows read a Mac's or Linux's `/Users/me/plugin` as an npm package (`filepath.IsAbs` and a drive letter only), so a sync carried the folder's path and the machine restoring it failed to install it (#2229). `TestIsPath` (internal/plugin), `TestPluginsCarried` (internal/provider), `TestRestorePluginsAndSignIn` (internal/backup) and `TestSyncPluginsAndSignIn` (internal/davsync) cover it.
 
 ## How ownership changes
 

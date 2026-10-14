@@ -38,6 +38,29 @@ func writeList(t testing.TB, body string) {
 	}
 }
 
+// A path is a path on every system, not only on the one that wrote it:
+// plugins.json is carried between machines by a backup or a sync, so a
+// folder added on a Mac comes to a Windows magpie, and it is a folder
+// there, not an npm package to install.
+func TestIsPath(t *testing.T) {
+	for spec, want := range map[string]bool{
+		"/Users/me/plugin":   true,
+		`\Users\me\plugin`:   true,
+		`\\server\share`:     true,
+		"C:/Users/me/plugin": true,
+		`C:\Users\me\plugin`: true,
+		"./plugin.js":        true,
+		"file:///abs/plugin": true,
+		"@scope/x@1.2":       false,
+		"owner/repo":         false,
+		"github:owner/repo":  false,
+	} {
+		if got := IsPath(spec); got != want {
+			t.Errorf("IsPath(%q) = %v, want %v", spec, got, want)
+		}
+	}
+}
+
 func TestLoadMissingIsEmptyNotGrown(t *testing.T) {
 	storeSandbox(t)
 	l := Load()
