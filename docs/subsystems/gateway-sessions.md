@@ -307,8 +307,9 @@ however old, so a client's history can be backfilled.
 - **Who may post:** the GET routes' rule, through the same `lanGuard`:
   this machine, or another with an enabled gateway key while shared. On
   top of that a browser page (`fromBrowser`) needs a key wherever it is,
-  since `corsGuard` lets a localhost page and `Origin: null` through, and
-  a held key is refused. `TestUsageIngestAccess`.
+  since `corsGuard` lets a localhost page through, asks a key of an
+  opaque origin (`Origin: null`: a sandboxed frame, an opened `file://`
+  page), and refuses a held key. `TestUsageIngestAccess`.
 - **Writing:** `usage.IngestReported`
   ([`internal/usage/reported.go`](../../internal/usage/reported.go))
   appends under the same mutex and to the same file as `usage.Append`,
