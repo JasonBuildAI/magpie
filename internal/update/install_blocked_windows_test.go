@@ -96,3 +96,55 @@ func TestStartCheckedPutsBackForReal(t *testing.T) {
 		})
 	}
 }
+
+// The file trialStart started stays held a moment afterwards — by
+// whatever scans a program as it starts — and the install moves it in as
+// soon as the trial ends: trialStart waits for it to be let go first, so
+// the move doesn't fail with a sharing violation the trial itself caused
+// (#2272). The file here is held like a scanner's until 150ms in, and the
+// rename right after trialStart fails if it returned while still held.
+func TestTrialStartWaitsForTheFile(t *testing.T) {
+	ping := filepath.Join(os.Getenv("SystemRoot"), "System32", "PING.EXE")
+	b, err := os.ReadFile(ping)
+	if err != nil {
+		t.Skip("no PING.EXE:", err)
+	}
+	good := filepath.Join(t.TempDir(), "magpie.exe.new")
+	os.WriteFile(good, b, 0o755)
+	letGo := holdForRollbackTest(t, good)
+	released := make(chan struct{})
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		letGo()
+		close(released)
+	}()
+	if err := trialStart(good); err != nil {
+		t.Fatalf("a program: %v", err)
+	}
+	if err := os.Rename(good, good+".moved"); err != nil {
+		t.Fatalf("trialStart returned while the file was still held: %v", err)
+	}
+	<-released // the hold is let go before the test's folder goes
+}
+
+// The install right after the trial, the order InstallBinaryAside makes:
+// a machine that holds the download a moment must not make the update
+// fail (#2272).
+func TestInstallRightAfterTheTrial(t *testing.T) {
+	ping := filepath.Join(os.Getenv("SystemRoot"), "System32", "PING.EXE")
+	b, err := os.ReadFile(ping)
+	if err != nil {
+		t.Skip("no PING.EXE:", err)
+	}
+	was := canStart
+	canStart = trialStart
+	t.Cleanup(func() { canStart = was })
+	exe, staged := rollbackFiles(t)
+	if err := os.WriteFile(staged, b, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := InstallBinary(staged, exe); err != nil {
+		t.Fatalf("install after the trial: %v", err)
+	}
+	wantInstallFile(t, exe, string(b))
+}
