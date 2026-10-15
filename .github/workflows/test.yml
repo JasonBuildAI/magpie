@@ -124,10 +124,13 @@ jobs:
         run: go test -v -count=1 ./internal/usage -run '^(TestWindows|TestLogChange|TestLogFileInfoPreservesIdentity$|TestUsageSameSizeAndMtimeRewrite$|TestLogGrowingRewriteThenAppend$|TestUsagePageCacheAfterUncachedQuery$)'
 
       # Install tests keep their files in t.TempDir; exercise real Windows
-      # executable and held-handle rename/rollback behavior.
+      # executable, trial-start and held-handle rename/rollback behavior.
+      # The trial tests were left out, so a trial that broke the move right
+      # after it stayed green here (#2272); TestTrialStartWaitsForTheFile
+      # watches for that.
       - name: Windows update install
         if: runner.os == 'Windows'
-        run: go test -v -count=1 -timeout 2m ./internal/update -run '^(TestInstallBinary|TestMoveAside)'
+        run: go test -v -count=1 -timeout 2m ./internal/update -run '^(TestInstallBinary|TestMoveAside|TestTrialStart|TestInstallRightAfterTheTrial)'
 
       # These tests use temporary paths, without the Unix HOME assumptions
       # of the full suite. Run the native link-kind and sharing-error checks,
